@@ -1,4 +1,7 @@
 # coding=utf8
+# flake8: noqa
 
-from .command import Command, main
-from . import login, query, mp4, mp3, ebook
+from geektime_dl.cli.command import Command, main, add_argument
+from geektime_dl.cli import (
+    login, query, mp4, mp3, ebook, dailylesson
+)

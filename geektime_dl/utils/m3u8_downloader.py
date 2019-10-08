@@ -1,19 +1,27 @@
 # coding: utf-8
 
-import math
 import requests
 from urllib.parse import urljoin
 import os
+from concurrent.futures import ThreadPoolExecutor, Future
+from pathlib import Path
+
+from tqdm import tqdm
 
 
 class Downloader:
-    def __init__(self):
-        pass
 
-    def run(self, m3u8_url, out_dir='.', file_name='outfile'):
+    def __init__(self, out_folder: str, workers: int = None):
+        self._out_folder = out_folder
+        if not os.path.isdir(out_folder):
+            os.makedirs(out_folder)
+        self._pool = ThreadPoolExecutor(max_workers=workers or 4)
 
-        if out_dir and not os.path.isdir(out_dir):
-            os.makedirs(out_dir)
+    def run(self, url: str, file_name: str = 'outfile',
+            pbar: bool = True) -> Future:
+        return self._pool.submit(self._run, url, file_name, pbar)
+
+    def _run(self, m3u8_url: str, file_name: str, pbar: bool):
 
         r = requests.get(m3u8_url, timeout=10)
         if not r.ok:
@@ -22,22 +30,21 @@ class Downloader:
         if not body:
             raise Exception('message=invalid_url:{}'.format(r.url))
 
-        ts_list = [urljoin(m3u8_url, n.strip()) for n in body.split('\n') if n and not n.startswith("#")]
+        ts_list = [urljoin(m3u8_url, n.strip())
+                   for n in body.split('\n') if n and not n.startswith("#")]
         if not ts_list:
             raise Exception('message=invalid_url:{}'.format(r.url))
-
-        with open(os.path.join(out_dir, file_name + '.' + ts_list[0].split('/')[-1].split('?')[0].split('.')[-1]), 'wb') as outfile:
-
-            for i, url in enumerate(ts_list):
-                percent = i * 1.0 / len(ts_list) * 100
-                print("download {} {:20} {}%".format(file_name, '#' * math.ceil(percent*20/100), math.ceil(percent)))
+        of = (file_name + '.'
+              + ts_list[0].split('/')[-1].split('?')[0].split('.')[-1])
+        with open(os.path.join(self._out_folder, of), 'wb') as outfile:
+            if pbar:
+                ts_list = tqdm(ts_list)
+                ts_list.set_description('视频下载中:{}'.format(
+                    Path(file_name).stem[:10]))
+            for url in ts_list:
                 r = requests.get(url, timeout=20)
-
                 if r.ok:
                     outfile.write(r.content)
-            print("download {} {:20} {}%".format(file_name, '#' * 20, 100))
 
-
-if __name__ == '__main__':
-    downloader = Downloader()
-    downloader.run('https://res001.geekbang.org/media/video/17/ae/17af9f0d61ff9df13b26f299082d81ae/sd/sd.m3u8', '.')
+    def shutdown(self, wait: bool = True):
+        return self._pool.shutdown(wait)

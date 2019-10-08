@@ -1,53 +1,57 @@
 # coding=utf8
 
-from geektime_dl.data_client.gk_apis import *
-from . import Command
+import sys
+
+from geektime_dl.data_client.gk_apis import GkApiClient, GkApiError
+from geektime_dl.cli import Command
 
 
 class Login(Command):
-    """登录极客时间，保存登录token
-    geektime login  [--account=<account>] [--password=<password>] [--area=<area>]
+    """登录极客时间，保存账号密码至配置文件"""
 
-    `[]`表示可选，`<>`表示相应变量值
-
-    --area: 注册手机号所属地区，默认86
-    --account: 手机账号，不提供可稍后手动输入
-    --password: 账号密码，不提供可稍后手动输入
-
-    notice: 登录后，token会保存至 cookie.json
-    e.g.: geektime login
-    """
-    def run(self, args):
-
-        for arg in args:
-            if '--area=' in arg:
-                area = arg.split('--area=')[1] or '86'
-                break
-        else:
-            area = '86'
-
-        for arg in args:
-            if '--account=' in arg:
-                account = arg.split('--account=')[1] or ''
-                break
-        else:
-            account = None
-
-        for arg in args:
-            if '--password=' in arg:
-                password = arg.split('--password=')[1] or ''
-                break
-        else:
-            password = None
+    def run(self, args: dict):
+        area = args['area']
+        account = args['account']
+        password = args['password']
+        need_save = not (area and account and password)
 
         if not account:
             account = input("enter your registered account(phone): ")
+        if not area:
+            area = input("enter country code: enter for 86 ") or '86'
         if not password:
-            password = input("enter password: ")
+            password = input("account: +{} {}\n"
+                             "enter password: ".format(area, account))
 
-        gk = GkApiClient()
-        gk.login(account, password, area)
-        print('登录成功')
+        try:
+            GkApiClient(account=account, password=password, area=area)
+            if need_save:
+                new_cfg = {
+                    'account': account,
+                    'password': password,
+                    'area': area
+                }
+                Command.save_cfg(new_cfg, args['config'])
+
+        except GkApiError as e:
+            sys.stdout.write("{}\nEnter again\n".format(e))
+            area = input("enter country code: enter for 86 ") or '86'
+            account = input("enter your registered account(phone): ")
+            password = input("account: +{} {}\n"
+                             "enter password: ".format(area, account))
+
+            GkApiClient(account=account, password=password, area=area)
+
+            new_cfg = {
+                'account': account,
+                'password': password,
+                'area': area
+            }
+            Command.save_cfg(new_cfg, args['config'])
+
+        sys.stdout.write("Login succeed\n")
+
+
 
 
 
