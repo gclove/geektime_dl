@@ -12,7 +12,7 @@ jobs:
     strategy:
       max-parallel: 1
       matrix:
-        python-version: [3.5, 3.6, 3.7]
+        python-version: [3.6, 3.7]
 
     steps:
     - uses: actions/checkout@v1
@@ -20,6 +20,11 @@ jobs:
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python-version }}
+    - name: echo system info
+      run: |
+        lsb_release -a
+        cat /etc/issue
+        uname -r
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
